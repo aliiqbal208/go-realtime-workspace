@@ -1,317 +1,96 @@
-# Go Realtime Workspace
+git clone <repository-url>
+git clone <repository-url>
+go mod download
+go run main.go
+# go-realtime-workspace
 
-A production-ready, scalable WebSocket-based real-time messaging and task management system for multi-tenant organizations with PostgreSQL and Redis integration.
+Lightweight, multi-tenant real‑time messaging (org + group + direct messages) over WebSockets with Redis history and PostgreSQL persistence.
 
-## 🌟 Features
-
-### Real-Time Messaging
-✅ Multi-tenant organization support
-✅ Group-based messaging within organizations  
-✅ WebSocket real-time communication
-✅ Message history with 7-day retention (Redis)
-✅ Broadcast to entire organization or specific groups
-✅ Automatic ping/pong heartbeat mechanism
-
-### Data Persistence
-✅ PostgreSQL for user and task management
-✅ Redis for message history and caching
-✅ Automatic timestamps and audit trails
-✅ Connection pooling and health checks
-
-### Task Management
-✅ User task creation and tracking
-✅ Status management (pending, in_progress, completed, cancelled)
-✅ Priority levels (low, medium, high, urgent)
-✅ Due date tracking with reminders
-✅ Task filtering and search
-
-### Production Ready
-✅ Thread-safe concurrent operations
-✅ Graceful shutdown handling
-✅ Docker support with docker-compose
-✅ Comprehensive error handling
-✅ Health check endpoints
-
-## 🏗️ Architecture Overview
-
-```
-OrgHub (Top Level)
-  └── Organization 1
-      ├── Group 1 (GroupHub)
-      │   ├── Client 1 (WebSocket)
-      │   ├── Client 2 (WebSocket)
-      │   └── Messages → Redis
-      └── Group 2
-          ├── Clients...
-          └── Messages → Redis
-  
-PostgreSQL
-  ├── Users (Organization members)
-  └── Tasks (User tasks)
-
-Redis
-  └── Message History (7-day TTL)
-```
-
-## 📚 Documentation
-
-- **[Quick Start Guide](./quickstart.sh)** - Get up and running in minutes
-- **[Database Setup](./DATABASE_SETUP.md)** - PostgreSQL and Redis installation
-- **[API Reference](./API_REFERENCE.md)** - Complete API documentation
-- **[Database Integration](./DATABASE_INTEGRATION.md)** - Integration details
-- **[API Testing Guide](./API_TESTING.md)** - Testing examples
+## ✨ Core Features
+* Organizations → Groups → Clients hierarchy
+* Group chat + direct (client ↔ client) messaging
+* Broadcast to org or single group
+* Redis 7‑day message history (TTL)
+* PostgreSQL users / tasks (extensible domain layer)
+* Clean hub architecture, thread‑safe maps
+* Graceful shutdown & health checks
 
 ## 🚀 Quick Start
-
-### Prerequisites
-
-- Go 1.23.1 or higher
-- Docker and docker-compose (recommended)
-- OR PostgreSQL 14+ and Redis 7+ (local installation)
-
-### Option 1: Using Docker (Recommended)
-
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd go-org-hub-architecture-main
+git clone <repo-url>
+cd go-realtime-workspace
 
-# 2. Run the quick start script
-chmod +x quickstart.sh
-./quickstart.sh
+# Start dependencies (adjust if you renamed docker-compose file)
 
-# 3. Install Go dependencies
-go mod download
 
-# 4. Start the application
+# Run the server
 go run main.go
 
-# 5. Test the health endpoint
-curl http://localhost:8080/health
-# Should return: OK
+# Health
+curl http://localhost:8080/api/v1/health
 ```
 
-### Option 2: Manual Setup
-
-See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed instructions.
-
-## 🔌 API Endpoints
-
-### Organization Management
-
-#### Create Organization
-```bash
-POST /api/v1/orgs
-Content-Type: application/json
-
-{
-  "id": "org-123",
-  "name": "My Organization"
-}
+## 🔌 WebSocket Usage
+Group channel:
 ```
-
-#### Get All Organizations
-```bash
-GET /api/v1/orgs
+ws://localhost:8080/ws/orgs/{orgId}/groups/{groupId}?clientId={clientId}
 ```
-
-### Group Management
-
-#### Create Group
-```bash
-POST /api/v1/orgs/{orgId}/groups
-Content-Type: application/json
-
-{
-  "id": "group-456",
-  "name": "Engineering Team"
-}
+Direct messaging channel:
 ```
-
-#### Get Organization Groups
-```bash
-GET /api/v1/orgs/{orgId}/groups
+ws://localhost:8080/ws/dm?clientId={clientId}
 ```
-
-### WebSocket Connection
-
-#### Join Group
-```bash
-WebSocket: ws://localhost:8080/ws/orgs/{orgId}/groups/{groupId}?clientId=client-789
-```
-
-Once connected, clients can send and receive messages in real-time.
-
-### Broadcasting
-
-#### Broadcast to Organization
-```bash
-POST /api/v1/orgs/{orgId}/broadcast
-Content-Type: application/json
-
-{
-  "content": "Message to all groups in organization"
-}
-```
-
-#### Broadcast to Group
-```bash
-POST /api/v1/orgs/{orgId}/groups/{groupId}/broadcast
-Content-Type: application/json
-
-{
-  "content": "Message to specific group"
-}
-```
-
-### Health Check
-```bash
-GET /health
-```
-
-## Message Format
-
-WebSocket messages follow this JSON structure:
-
+Send (client → group or direct):
 ```json
 {
-  "org_id": "org-123",
-  "group_id": "group-456",
-  "client_id": "client-789",
-  "content": "Hello, World!"
+  "content": "Hello team",
+  "recipient_id": "<clientId-optional-for-dm>"
 }
 ```
 
-## Getting Started
+## 🧾 Key HTTP Endpoints (minimal)
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| POST | /api/v1/orgs | Create organization |
+| POST | /api/v1/orgs/{orgId}/groups | Create group |
+| GET  | /api/v1/orgs | List orgs |
+| GET  | /api/v1/orgs/{orgId}/groups | List groups in org |
+| POST | /api/v1/orgs/{orgId}/broadcast | Org broadcast |
+| POST | /api/v1/orgs/{orgId}/groups/{groupId}/broadcast | Group broadcast |
+| GET  | /api/v1/health | Liveness & dependency check |
 
-### Prerequisites
-
-- Go 1.23.1 or higher
-- Dependencies:
-  - `github.com/gorilla/mux` - HTTP router
-  - `github.com/gorilla/websocket` - WebSocket implementation
-
-### Installation
-
-1. Clone the repository
-```bash
-git clone <repository-url>
-cd go-org-hub-architecture-main
+## 🗂 Structure
+```
+hub/         core hubs (org, group, client)
+handlers/    HTTP + WebSocket handlers
+middleware/  logging, recovery, CORS, rate limit, security, validation
+config/      config & initialization
 ```
 
-2. Install dependencies
-```bash
-go mod download
-```
+## ⚙️ Environment (set via vars or .env)
+| Variable | Default | Purpose |
+| -------- | ------- | ------- |
+| APP_PORT | 8080 | HTTP / WS listen port |
+| PG_HOST  | localhost | PostgreSQL host |
+| PG_DB    | realtime_workspace | Database name |
+| REDIS_ADDR | localhost:6379 | Redis address |
 
-3. Run the server
-```bash
-go run main.go
-```
+## 🛣 Roadmap (next)
+* Auth (JWT / OAuth) & per‑org access control
+* Horizontal scaling (Redis Pub/Sub fanout)
+* Metrics / tracing (Prometheus + OpenTelemetry)
+* Presence & typing indicators
+* Rate limiting refinement / quota per org
 
-The server will start on `http://localhost:8080`
-
-## Usage Example
-
-### 1. Create an Organization
-```bash
-curl -X POST http://localhost:8080/api/v1/orgs \
-  -H "Content-Type: application/json" \
-  -d '{"id":"org1","name":"Acme Corp"}'
-```
-
-### 2. Create a Group
-```bash
-curl -X POST http://localhost:8080/api/v1/orgs/org1/groups \
-  -H "Content-Type: application/json" \
-  -d '{"id":"group1","name":"Engineering"}'
-```
-
-### 3. Connect via WebSocket
+## 🧪 Simple Browser Test
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/ws/orgs/org1/groups/group1?clientId=user123');
-
-ws.onopen = () => {
-  console.log('Connected!');
-  ws.send(JSON.stringify({
-    content: 'Hello from client!'
-  }));
-};
-
-ws.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  console.log('Received:', message);
-};
+const ws = new WebSocket('ws://localhost:8080/ws/orgs/org1/groups/group1?clientId=alice');
+ws.onopen = () => ws.send(JSON.stringify({ content: 'Hello world' }));
+ws.onmessage = e => console.log('Received', e.data);
 ```
 
-### 4. Broadcast Message
-```bash
-curl -X POST http://localhost:8080/api/v1/orgs/org1/groups/group1/broadcast \
-  -H "Content-Type: application/json" \
-  -d '{"content":"Team meeting in 5 minutes!"}'
-```
+## 📄 License
+Add your chosen license (MIT/Apache-2.0). Replace this section.
 
-## Configuration
-
-Configuration can be customized in `config/config.go`. Default values:
-
-- **Server Port**: 8080
-- **Read/Write Timeout**: 15 seconds
-- **WebSocket Buffer Size**: 1024 bytes
-- **Message Buffer**: 256 messages
-- **Ping Interval**: 54 seconds
-- **Pong Wait**: 60 seconds
-
-## Project Structure
-
-```
-.
-├── main.go                 # Application entry point
-├── go.mod                  # Go module dependencies
-├── README.md              # This file
-├── config/
-│   └── config.go          # Configuration management
-├── handlers/
-│   └── websocket_handler.go  # HTTP/WebSocket handlers
-└── hub/
-    ├── client.go          # WebSocket client implementation
-    ├── group_hub.go       # Group management
-    └── org_hub.go         # Organization management
-```
-
-## Concurrency & Thread Safety
-
-- All map operations are protected with `sync.RWMutex`
-- Non-blocking channel sends to prevent deadlocks
-- Buffered channels for message queuing
-- Proper goroutine cleanup on disconnection
-
-## Graceful Shutdown
-
-The server handles `SIGINT` and `SIGTERM` signals gracefully:
-- Stops accepting new connections
-- Allows existing connections to complete
-- 30-second timeout for shutdown
-
-## Contributing
-
-Contributions are welcome! Please ensure:
-- Code follows Go best practices
-- Thread-safe operations
-- Proper error handling
-- Documentation for public APIs
-
-## License
-
-[Add your license here]
-
-## Future Improvements
-
-- [ ] Authentication and authorization
-- [ ] Message persistence
-- [ ] Redis pub/sub for horizontal scaling
-- [ ] Metrics and monitoring
-- [ ] Rate limiting
-- [ ] Message encryption
-- [ ] Client reconnection handling
-- [ ] Presence tracking
+---
+Concise by design. For extended docs (API details, DB schema, scaling notes) create `docs/` as the project evolves.
+See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed instructions.
